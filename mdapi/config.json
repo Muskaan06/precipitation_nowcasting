@@ -1,0 +1,23 @@
+{
+"user_credentials": {
+        "username/email": "muskaan06",
+        "password": "@Isrodata1267"
+},
+
+"search_parameters": {
+        "datasetId": "3RIMG_L2B_IMC",
+        "startTime": "2023-01-01",
+        "endTime": "2023-06-31",
+        "count": "",
+        "boundingBox": "",
+        "gId": ""
+},
+
+"download_settings": {
+        "download_path" : "../",
+        "organize_by_date": true,
+        "skip_user_input": true,
+        "generate_error_logs": true,
+        "error_logs_dir": "../"
+}
+} 
