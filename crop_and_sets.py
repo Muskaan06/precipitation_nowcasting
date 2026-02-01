@@ -118,6 +118,9 @@ if __name__ == "__main__":
     files_in_set = 0        #to keep count of number of file in set
     stack = []              #to keep track of previous file
     sets_arr = []           #current set keeping cropped files
+    i=0
+    multiset = []
+    mulit_metadata = dict()
 
     while index < len(time_files):
         day = time_files[index]  
@@ -141,17 +144,31 @@ if __name__ == "__main__":
                     files_in_set += 1
 
                 else:
+
+                    multiset.append(sets_arr)
                     sets_arr = np.stack(sets_arr, axis=0)
                     print(prev_time)
+                    begin_day, begin_time = extract_datetime_from_path(time_files[set_start_index])[0], extract_datetime_from_path(time_files[set_start_index])[1]
                     metadata = {
-                        "date":prev_day[0],
-                        "start_time": extract_datetime_from_path(time_files[set_start_index])[1],
+                        "start_date":begin_day[0],
+                        "end_date":prev_day[0],
+                        "start_time": begin_time,
                         "end_time": prev_time
                     }
                     print(sets_arr.shape)
                     print(metadata)
+                    mulit_metadata[f"set{i}"] = metadata
+                    i += 1
                     #write saving code
-                    
+                    if len(multiset) == 10:
+                        multiset = np.stack(multiset, axis=0)
+                        np.savez(
+                            f"set{i-10}-{i}.npz",
+                            array=multiset,
+                            metadata=mulit_metadata
+                        )
+                        break
+
                     #setting new index
                     index = set_start_index + 1
                     set_start_index = index
