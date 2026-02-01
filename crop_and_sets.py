@@ -37,7 +37,7 @@ def cropping(file_path):
         lat  = f["Latitude"][:].astype(np.float32) / 100.0
         lon  = f["Longitude"][:].astype(np.float32) / 100.0
 
-    lat_min, lat_max = 22.0, 30.1
+    lat_min, lat_max = 22.0, 30.0
     lon_min, lon_max = 90.0, 98.0
 
     valid = (
@@ -159,6 +159,7 @@ if __name__ == "__main__":
                     stack.clear()
                     sets_arr = []
                     print("\n\n\n")
+                    continue
             
             else:   #if not 30 min apart
                 set_start_index = index
@@ -166,6 +167,7 @@ if __name__ == "__main__":
                 stack.clear()
                 sets_arr = []
         
+      
         stack.append(day)
         index += 1
 
