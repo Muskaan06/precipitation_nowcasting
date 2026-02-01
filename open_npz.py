@@ -8,8 +8,18 @@ rain = data["rain"]   # (N, N)
 lat  = data["lat"]    # (N,)
 lon  = data["lon"]    # (N,)
 
+# ---- SHOW SHAPES ----
+print("NPZ file contents and shapes:")
+print(f"rain shape: {rain.shape}")
+print(f"lat  shape: {lat.shape}")
+print(f"lon  shape: {lon.shape}")
+print("-" * 40)
+
 # Create 2D lat/lon grids
 lon2d, lat2d = np.meshgrid(lon, lat)
+
+print(f"lon2d shape: {lon2d.shape}")
+print(f"lat2d shape: {lat2d.shape}")
 
 # Plot
 plt.figure(figsize=(8, 8))

@@ -17,7 +17,7 @@ BAD_MAX_THRESHOLD = 5
 
 # add the npz opening code
 np.random.seed(42)
-dataset = np.random.rand(5, 24, 224, 224)
+dataset = np.random.rand(24,3, 224, 224)
 
 dl = len(dataset)
 print(dl)
