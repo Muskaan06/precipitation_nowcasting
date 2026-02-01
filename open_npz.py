@@ -3,10 +3,22 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 
 # Load data
-data = np.load("INSAT_IMC_20230625_1215_4km_grid.npz")
-rain = data["rain"]   # (N, N)
-lat  = data["lat"]    # (N,)
-lon  = data["lon"]    # (N,)
+data = np.load("set0-10.npz", allow_pickle=True)
+
+print(data["array"].shape)
+print(data["metadata"])
+
+set0 = data["array"][0]
+print("\nset shape: ", set0.shape)
+
+#each file inside a set
+file1 = set0[0]
+print(file1[0].shape)
+
+
+rain = file1[0]   # (N, N)
+lat  = file1[1][:, 0]    # (N,)
+lon  = file1[2][0, :]    # (N,)
 
 # ---- SHOW SHAPES ----
 print("NPZ file contents and shapes:")
@@ -24,8 +36,8 @@ print(f"lat2d shape: {lat2d.shape}")
 # Plot
 plt.figure(figsize=(8, 8))
 plt.pcolormesh(
-    lon2d,
-    lat2d,
+    lon,
+    lat,
     rain,
     shading="auto",
     cmap="viridis",

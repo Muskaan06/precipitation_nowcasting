@@ -5,7 +5,7 @@ import matplotlib.colors as colors
 from mpl_toolkits.basemap import Basemap
 
 # 1. Load and clean data
-file_path = "3RIMG_25JUN2023_1215_L2B_IMC_V01R00.h5"
+file_path = "../datasets/3RIMG_L2B_IMC/2023/cont_set_1/3RIMG_16JUN2023_0215_L2B_IMC_V01R00.h5"
 with h5py.File(file_path, "r") as f:
     rain = np.squeeze(f["IMC"][:]).astype(np.float32)
     lat  = f["Latitude"][:].astype(np.float32) / 100.0
@@ -84,52 +84,52 @@ print("Grid resolution (deg):", res)
 # Save EVERYTHING in one file
 # ============================
 
-np.savez(
-    "INSAT_IMC_20230625_1215_4km_grid.npz",
-    rain=rain_grid,     # (N, N) mm/hr
-    lat=lat_bins,       # (N,)
-    lon=lon_bins        # (N,)
-)
+# np.savez(
+#     "INSAT_IMC_20230625_1215_4km_grid.npz",
+#     rain=rain_grid,     # (N, N) mm/hr
+#     lat=lat_bins,       # (N,)
+#     lon=lon_bins        # (N,)
+# )
 
-print("Saved single file: INSAT_IMC_20230625_1215_4km_grid.npz")
-print("Rain grid shape:", rain_grid.shape)
+# print("Saved single file: INSAT_IMC_20230625_1215_4km_grid.npz")
+# print("Rain grid shape:", rain_grid.shape)
 
 
 ## 4. Square FIGURE
-#fig, ax = plt.subplots(figsize=(10, 10))  # ✅ square canvas
-#
-## 5. Basemap
-#m = Basemap(
-#    projection="cyl",
-#    llcrnrlon=90,
-#    urcrnrlon=98,
-#    llcrnrlat=22,
-#    urcrnrlat=30,
-#    resolution="l",
-#    ax=ax
-#)
-#
-##m.drawcoastlines(linewidth=1.2) 
-##m.drawcountries(linewidth=0.8) 
-##m.drawmapboundary(fill_color="lightcyan") 
-##m.drawstates(linewidth=0.8) 
-##m.fillcontinents(color="whitesmoke", lake_color="lightcyan")
-#
-## ✅ Force square map geometry
-#ax.set_aspect("equal", adjustable="box")
-#
-## 6. Plot rainfall
-#mesh = m.pcolormesh(
-#    lon,
-#    lat,
-#    rain,
-#    latlon=True,
-#    shading="auto",
-#    cmap="viridis",
-#    norm=colors.LogNorm(vmin=0.1, vmax=50)
-#)
-#
-#plt.colorbar(mesh, label="Rainfall Rate (mm/hr)", fraction=0.035, pad=0.02)
-#plt.title("INSAT-3DR IMC Rainfall (Square Map)")
-#
-#plt.show()
+fig, ax = plt.subplots(figsize=(8, 8))  # ✅ square canvas
+
+# 5. Basemap
+m = Basemap(
+   projection="cyl",
+   llcrnrlon=90,
+   urcrnrlon=98,
+   llcrnrlat=22,
+   urcrnrlat=30,
+   resolution="l",
+   ax=ax
+)
+
+#m.drawcoastlines(linewidth=1.2) 
+#m.drawcountries(linewidth=0.8) 
+#m.drawmapboundary(fill_color="lightcyan") 
+#m.drawstates(linewidth=0.8) 
+#m.fillcontinents(color="whitesmoke", lake_color="lightcyan")
+
+# ✅ Force square map geometry
+ax.set_aspect("equal", adjustable="box")
+
+# 6. Plot rainfall
+mesh = m.pcolormesh(
+   lon,
+   lat,
+   rain,
+   latlon=True,
+   shading="auto",
+   cmap="viridis",
+   norm=colors.LogNorm(vmin=0.1, vmax=50)
+)
+
+plt.colorbar(mesh, label="Rainfall Rate (mm/hr)", fraction=0.035, pad=0.02)
+plt.title("INSAT-3DR IMC Rainfall (Square Map)")
+
+plt.show()
