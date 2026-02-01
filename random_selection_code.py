@@ -10,32 +10,31 @@ PERCENTAGE_THRESHOLD = 0.5
 BETTER_PERCENTAGE_THRESHOLD = 0.3
 BAD_THRESHOLD = 3
 BAD_MAX_THRESHOLD = 5
+HIGH_WEIGHTAGE = 1
+LOW_WEIGHTAGE = 0.7
 
 
 
 # assuming input size = (B ,24, 224, 224)
 
-# add the npz opening code
-np.random.seed(42)
-dataset = np.random.rand(24,3, 224, 224)
-
-dl = len(dataset)
+data = np.load("set0-10.npz", allow_pickle=True)
+dl = len(data['array'])
 print(dl)
 
 high = {}
 low = {}
-for i, sets in enumerate(dataset):
+for i, sets in enumerate(data['array']):
     t = []
     c = 0
     check = 0
     for image in sets:
-        a = image>BASE_THRESHOLD
-        b = image>BETTER_VALUE
+        a = image[0]>BASE_THRESHOLD
+        b = image[0]>BETTER_VALUE
 
-        if np.sum(b)/(224*224) >= BETTER_PERCENTAGE_THRESHOLD:
+        if np.sum(b)/(112*112) >= BETTER_PERCENTAGE_THRESHOLD:
             c = 0
             t.append(2)
-        elif np.sum(a)/(224*224) >= PERCENTAGE_THRESHOLD:
+        elif np.sum(a)/(112*112) >= PERCENTAGE_THRESHOLD:
             c = 0
             t.append(1)
         else:
@@ -51,12 +50,8 @@ for i, sets in enumerate(dataset):
         high[i].append(t)
     elif check==1:
         low[i] = []
-        low[i].append(t)
+        low[i].append(t) 
 
-
-#give weitghage to high and low 
-HIGH_WEIGHTAGE = 1
-LOW_WEIGHTAGE = 0.7
 
 for h in high:
     a = sum(high[h][0])
