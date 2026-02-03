@@ -13,6 +13,7 @@ print("\nset shape: ", set0.shape)
 
 #each file inside a set
 file1 = set0[0]
+# print(file1)
 print(file1[0].shape)
 
 
