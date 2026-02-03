@@ -7,6 +7,8 @@ import os
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
 from datetime import datetime, timedelta
+import time
+# from random_selection_code import weighted_selection_without_replacement
 
 def extract_datetime_from_path(path):
     filename = Path(path).name
@@ -118,17 +120,17 @@ if __name__ == "__main__":
     files_in_set = 0        #to keep count of number of file in set
     stack = []              #to keep track of previous file
     sets_arr = []           #current set keeping cropped files
-    i=0
-    multiset = []
-    mulit_metadata = dict()
+    i=0                     #counts set no
+    multiset = []           #store multiple sets together (default=10)
+    mulit_metadata = dict() #stores multiple metadatas
 
     while index < len(time_files):
         day = time_files[index]  
         file_path = dir_path + '/' + day        
         print("file name: ",file_path)
-        print("current index: ", index)
-        print("no of file in current set: ", files_in_set)
-        print("start time: ",time_files[set_start_index])
+        # print("current index: ", index)
+        # print("no of file in current set: ", files_in_set)
+        # print("start time: ",time_files[set_start_index])
         
         d,t=extract_datetime_from_path(day)[0], extract_datetime_from_path(day)[1]
         print(d,"   ",t)
@@ -143,7 +145,7 @@ if __name__ == "__main__":
                     sets_arr.append(cropped_file)
                     files_in_set += 1
 
-                else:
+                else:       # create metadata, multiset and random selection
 
                     multiset.append(sets_arr)
                     sets_arr = np.stack(sets_arr, axis=0)
@@ -155,6 +157,7 @@ if __name__ == "__main__":
                         "start_time": begin_time,
                         "end_time": prev_time
                     }
+                    print("This is set no: ",i)
                     print(sets_arr.shape)
                     print(metadata)
                     mulit_metadata[f"set{i}"] = metadata
@@ -163,11 +166,16 @@ if __name__ == "__main__":
                     if len(multiset) == 10:
                         multiset = np.stack(multiset, axis=0)
                         np.savez(
-                            f"set{i-10}-{i}.npz",
+                            f"../datasets/cropped_data/set{i-10}-{i}.npz",
                             array=multiset,
                             metadata=mulit_metadata
                         )
-                        break
+                        print(multiset.shape)
+                        multiset = []
+                        time.sleep(5)
+                        # random selection
+                        
+                        # break
 
                     #setting new index
                     index = set_start_index + 1
