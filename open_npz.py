@@ -3,12 +3,12 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 
 # Load data
-data = np.load("set0-10.npz", allow_pickle=True)
+data = np.load("data/set20-30.npz", allow_pickle=True)
 
 print(data["array"].shape)
 print(data["metadata"])
 
-set0 = data["array"][0]
+set0 = data["array"][6]
 print("\nset shape: ", set0.shape)
 
 #each file inside a set
@@ -19,7 +19,7 @@ print(file1[0].shape)
 rain = file1[0]   # (N, N)
 lat  = file1[1][:, 0]    # (N,)
 lon  = file1[2][0, :]    # (N,)
-
+print(rain)
 # ---- SHOW SHAPES ----
 print("NPZ file contents and shapes:")
 print(f"rain shape: {rain.shape}")
