@@ -6,7 +6,7 @@ def group_continuous_date_folders(root_dir):
     root = Path(root_dir)
 
     folders = []
-    BASE_YEAR = 2024  # leap-safe reference year
+    BASE_YEAR = 2024  # leap-safe
 
     for p in root.iterdir():
         if p.is_dir():
@@ -33,14 +33,14 @@ def group_continuous_date_folders(root_dir):
 
     groups.append(current)
 
-    # create group folders and move data
     for idx, group in enumerate(groups, start=1):
         group_dir = root / f"group_{idx:02d}"
         group_dir.mkdir(exist_ok=True)
 
-        for _, folder_path in group:
-            shutil.move(str(folder_path), group_dir / folder_path.name)
-            # use shutil.copytree(...) instead if you want to copy
+        for _, date_folder in group:
+            for item in date_folder.iterdir():
+                shutil.move(str(item), group_dir / item.name)
+            date_folder.rmdir()  # remove empty date folder
 
 # usage
 group_continuous_date_folders("../datasets/test_folder")
