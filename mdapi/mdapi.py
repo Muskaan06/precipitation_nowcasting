@@ -36,7 +36,7 @@ def preprocess_json(raw_json):
 def load_config(): 
     """Loads and validates configuration from config.json."""
     try:
-        with open("config.json", "r") as file:
+        with open("mdapi/config.json", "r") as file:
             raw_config = file.read()
         
         try:
