@@ -190,6 +190,7 @@ def compute_weighted_selection(
 
 
 def weighted_selection_once(indices, weights, num_to_select, min_prob=0.1):
+
     indices = np.array(indices)
     weights = np.array(weights, dtype=float)
 
