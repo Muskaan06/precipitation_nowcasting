@@ -87,9 +87,11 @@ print(weights)
 indices = list(range(len(weights)))
 
 def weighted_selection_once(indices, weights, num_to_select, min_prob=0.1):
+
     indices = np.array(indices)
     weights = np.array(weights, dtype=float)
-    
+    if len(set(weights))==1 and weights[0]<1.2:
+        return []
     total_weight = weights.sum()
     if total_weight == 0:
         return []
