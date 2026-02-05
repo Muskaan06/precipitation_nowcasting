@@ -106,6 +106,11 @@ def cropping(file_path):
     img_data = [rain_grid, lat_bins, lon_bins]
     return img_data
 
+def same_or_one_day_apart(d1, d2):
+    d1 = datetime.strptime(d1, "%Y-%m-%d")
+    d2 = datetime.strptime(d2, "%Y-%m-%d")
+    return abs((d1 - d2).days) <= 1
+
 if __name__ == "__main__":
 
     dir_path = "../datasets/3RIMG_L2B_IMC/2023/cont_set_1" 
@@ -133,49 +138,53 @@ if __name__ == "__main__":
         # print("start time: ",time_files[set_start_index])
         
         d,t=extract_datetime_from_path(day)[0], extract_datetime_from_path(day)[1]
-        print(d,"   ",t)
+        # print(d,"   ",t)
 
         if stack:
             prev_file = stack.pop()
             prev_day, prev_time = extract_datetime_from_path(prev_file)
-            if is_30_min_apart(prev_time, t):        #to check if current file is continuous of prvious file
-                if files_in_set < 24:                   #to check if number of files in current set is < 20: if yes then continue appending else save the set
+
+            #check continuity
+                #condition 1: 30 min apart and of same date or next day 
+                #condition 2: 30 min apart but between last day of this month and next day of next month  
+            if (is_30_min_apart(prev_time, t)) and (same_or_one_day_apart(d[0], prev_day[0])):        
+                if files_in_set < 24:                  
                     
                     cropped_file = cropping(file_path)
                     sets_arr.append(cropped_file)
                     files_in_set += 1
 
                 else:       # create metadata, multiset and random selection
-
-                    multiset.append(sets_arr)
-                    sets_arr = np.stack(sets_arr, axis=0)
-                    print(prev_time)
-                    begin_day, begin_time = extract_datetime_from_path(time_files[set_start_index])[0], extract_datetime_from_path(time_files[set_start_index])[1]
-                    metadata = {
-                        "start_date":begin_day[0],
-                        "end_date":prev_day[0],
-                        "start_time": begin_time,
-                        "end_time": prev_time
-                    }
-                    print("This is set no: ",i)
-                    print(sets_arr.shape)
-                    print(metadata)
-                    mulit_metadata[f"set{i}"] = metadata
-                    i += 1
-                    #write saving code
-                    if len(multiset) == 10:
-                        multiset = np.stack(multiset, axis=0)
-                        np.savez(
-                            f"../datasets/cropped_data/set{i-10}-{i}.npz",
-                            array=multiset,
-                            metadata=mulit_metadata
-                        )
-                        print(multiset.shape)
-                        multiset = []
-                        time.sleep(5)
-                        # random selection
-                        
-                        # break
+                    if len(sets_arr) == 24:
+                        multiset.append(sets_arr)
+                        sets_arr = np.stack(sets_arr, axis=0)
+                        print(prev_time)
+                        begin_day, begin_time = extract_datetime_from_path(time_files[set_start_index])[0], extract_datetime_from_path(time_files[set_start_index])[1]
+                        metadata = {
+                            "start_date":begin_day[0],
+                            "end_date":prev_day[0],
+                            "start_time": begin_time,
+                            "end_time": prev_time
+                        }
+                        print("This is set no: ",i)
+                        print(sets_arr.shape)
+                        print(metadata)
+                        mulit_metadata[f"set{i}"] = metadata
+                        i += 1
+                        #write saving code
+                        if len(multiset) == 10:
+                            multiset = np.stack(multiset, axis=0)
+                            np.savez(
+                                f"../datasets/set{i-10}-{i}.npz",
+                                array=multiset,
+                                metadata=mulit_metadata
+                            )
+                            print(multiset.shape)
+                            multiset = []
+                            time.sleep(10)
+                            # random selection
+                            
+                            # break
 
                     #setting new index
                     index = set_start_index + 1
@@ -186,7 +195,7 @@ if __name__ == "__main__":
                     print("\n\n\n")
                     continue
             
-            else:   #if not 30 min apart
+            else:   #if not 30 min apart or continuous dates
                 set_start_index = index
                 files_in_set = 0
                 stack.clear()
@@ -197,49 +206,3 @@ if __name__ == "__main__":
         index += 1
 
         
-
-    # metadata = {
-    #     "date":d,
-    #     "start_time": "00:15",
-    #     "end_time": "12:15"
-    # }
-
-    # np.savez(
-    #     "set1_30JUN2023.npz",
-    #     array=sets_arr[:24],
-    #     metadata=metadata
-    # )
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    #  if t == "12:15" :
-    #             plt.figure(figsize=(8, 8))
-    #             plt.pcolormesh(
-    #                 lon_bins,
-    #                 lat_bins,
-    #                 rain_grid,
-    #                 shading="auto",
-    #                 cmap="viridis",
-    #                 norm=LogNorm(vmin=0.1, vmax=50)
-    #             )
-
-    #             plt.colorbar(label="Rainfall Rate (mm/hr)")
-    #             plt.xlabel("Longitude")
-    #             plt.ylabel("Latitude")
-    #             plt.title("INSAT-3DR IMC Rainfall (4 km Grid)")
-    #             plt.gca().set_aspect("equal", adjustable="box")
-    #             plt.show()
