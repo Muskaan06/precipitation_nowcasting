@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 
 # Load data
-data = np.load("data/set20-30.npz", allow_pickle=True)
+data = np.load("../datasets/set10-20.npz", allow_pickle=True)
 
 print(data["array"].shape)
 print(data["metadata"])

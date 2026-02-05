@@ -181,6 +181,7 @@ if __name__ == "__main__":
                             )
                             print(multiset.shape)
                             multiset = []
+                            mulit_metadata.clear()
                             time.sleep(10)
                             # random selection
                             
