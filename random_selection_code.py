@@ -171,12 +171,12 @@ def compute_weighted_selection(
     for h in high:
         score_sum = sum(high[h][0])
         normalized_weight = (score_sum / max_possible_score) * high_weightage
-        high[h].append(max(minimum_probability, normalized_weight))
+        high[h].append(normalized_weight)
 
     for l in low:
         score_sum = sum(low[l][0])
         normalized_weight = (score_sum / max_possible_score) * low_weightage
-        low[l].append(max(minimum_probability, normalized_weight))
+        low[l].append(normalized_weight)
 
     weights = [0] * dl
     for h in high:
