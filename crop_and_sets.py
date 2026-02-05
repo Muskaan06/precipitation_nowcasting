@@ -31,7 +31,14 @@ def extract_datetime_from_path(path):
 
 def is_30_min_apart(t1, t2):
     fmt = "%H:%M"
-    return datetime.strptime(t2, fmt) - datetime.strptime(t1, fmt) == timedelta(minutes=30)
+    d1 = datetime.strptime(t1, fmt)
+    d2 = datetime.strptime(t2, fmt)
+
+    # handle midnight rollover
+    if d2 < d1:
+        d2 += timedelta(days=1)
+
+    return d2 - d1 == timedelta(minutes=30)
 
 def cropping(file_path):
     with h5py.File(file_path, "r") as f:
@@ -113,97 +120,99 @@ def same_or_one_day_apart(d1, d2):
 
 if __name__ == "__main__":
 
-    dir_path = "../datasets/3RIMG_L2B_IMC/2023/cont_set_1" 
+#     dir_path = "../datasets/3RIMG_L2B_IMC/2023/cont_set_1" 
 
-    # for day in os.listdir(year_dir_path)[:3]:       #day = [cont_set_1, cont_set_2, cont_set_3]
+#     # for day in os.listdir(year_dir_path)[:3]:       #day = [cont_set_1, cont_set_2, cont_set_3]
        
-    count = 0
-    time_files = sorted(os.listdir(dir_path))   #[file1.h5,....]
+#     count = 0
+#     time_files = sorted(os.listdir(dir_path))   #[file1.h5,....]
 
-    index = 0
-    set_start_index = 0
-    files_in_set = 0        #to keep count of number of file in set
-    stack = []              #to keep track of previous file
-    sets_arr = []           #current set keeping cropped files
-    i=0                     #counts set no
-    multiset = []           #store multiple sets together (default=10)
-    mulit_metadata = dict() #stores multiple metadatas
+#     index = 0
+#     set_start_index = 0
+#     files_in_set = 0        #to keep count of number of file in set
+#     stack = []              #to keep track of previous file
+#     sets_arr = []           #current set keeping cropped files
+#     i=0                     #counts set no
+#     multiset = []           #store multiple sets together (default=10)
+#     mulit_metadata = dict() #stores multiple metadatas
 
-    while index < len(time_files):
-        day = time_files[index]  
-        file_path = dir_path + '/' + day        
-        print("file name: ",file_path)
-        # print("current index: ", index)
-        # print("no of file in current set: ", files_in_set)
-        # print("start time: ",time_files[set_start_index])
+#     while index < len(time_files):
+#         day = time_files[index]  
+#         file_path = dir_path + '/' + day        
+#         print("file name: ",file_path)
+#         # print("current index: ", index)
+#         # print("no of file in current set: ", files_in_set)
+#         # print("start time: ",time_files[set_start_index])
         
-        d,t=extract_datetime_from_path(day)[0], extract_datetime_from_path(day)[1]
-        # print(d,"   ",t)
+#         d,t=extract_datetime_from_path(day)[0], extract_datetime_from_path(day)[1]
+#         # print(d,"   ",t)
 
-        if stack:
-            prev_file = stack.pop()
-            prev_day, prev_time = extract_datetime_from_path(prev_file)
+#         if stack:
+#             prev_file = stack.pop()
+#             prev_day, prev_time = extract_datetime_from_path(prev_file)
 
-            #check continuity
-                #condition 1: 30 min apart and of same date or next day 
-                #condition 2: 30 min apart but between last day of this month and next day of next month  
-            if (is_30_min_apart(prev_time, t)) and (same_or_one_day_apart(d[0], prev_day[0])):        
-                if files_in_set < 24:                  
+#             #check continuity
+#                 #condition 1: 30 min apart and of same date or next day 
+#                 #condition 2: 30 min apart but between last day of this month and next day of next month  
+#             if (is_30_min_apart(prev_time, t)) and (same_or_one_day_apart(d[0], prev_day[0])):        
+#                 if files_in_set < 24:                  
                     
-                    cropped_file = cropping(file_path)
-                    sets_arr.append(cropped_file)
-                    files_in_set += 1
+#                     cropped_file = cropping(file_path)
+#                     sets_arr.append(cropped_file)
+#                     files_in_set += 1
 
-                else:       # create metadata, multiset and random selection
-                    if len(sets_arr) == 24:
-                        multiset.append(sets_arr)
-                        sets_arr = np.stack(sets_arr, axis=0)
-                        print(prev_time)
-                        begin_day, begin_time = extract_datetime_from_path(time_files[set_start_index])[0], extract_datetime_from_path(time_files[set_start_index])[1]
-                        metadata = {
-                            "start_date":begin_day[0],
-                            "end_date":prev_day[0],
-                            "start_time": begin_time,
-                            "end_time": prev_time
-                        }
-                        print("This is set no: ",i)
-                        print(sets_arr.shape)
-                        print(metadata)
-                        mulit_metadata[f"set{i}"] = metadata
-                        i += 1
-                        #write saving code
-                        if len(multiset) == 10:
-                            multiset = np.stack(multiset, axis=0)
-                            np.savez(
-                                f"../datasets/set{i-10}-{i}.npz",
-                                array=multiset,
-                                metadata=mulit_metadata
-                            )
-                            print(multiset.shape)
-                            multiset = []
-                            mulit_metadata.clear()
-                            time.sleep(10)
-                            # random selection
+#                 else:       # create metadata, multiset and random selection
+#                     if len(sets_arr) == 24:
+#                         multiset.append(sets_arr)
+#                         sets_arr = np.stack(sets_arr, axis=0)
+#                         print(prev_time)
+#                         begin_day, begin_time = extract_datetime_from_path(time_files[set_start_index])[0], extract_datetime_from_path(time_files[set_start_index])[1]
+#                         metadata = {
+#                             "start_date":begin_day[0],
+#                             "end_date":prev_day[0],
+#                             "start_time": begin_time,
+#                             "end_time": prev_time
+#                         }
+#                         print("This is set no: ",i)
+#                         print(sets_arr.shape)
+#                         print(metadata)
+#                         mulit_metadata[f"set{i}"] = metadata
+#                         i += 1
+#                         #write saving code
+#                         if len(multiset) == 10:
+#                             multiset = np.stack(multiset, axis=0)
+#                             np.savez(
+#                                 f"../datasets/set{i-10}-{i}.npz",
+#                                 array=multiset,
+#                                 metadata=mulit_metadata
+#                             )
+#                             print(multiset.shape)
+#                             multiset = []
+#                             mulit_metadata.clear()
+#                             time.sleep(10)
+#                             # random selection
                             
-                            # break
+#                             # break
 
-                    #setting new index
-                    index = set_start_index + 1
-                    set_start_index = index
-                    files_in_set = 0
-                    stack.clear()
-                    sets_arr = []
-                    print("\n\n\n")
-                    continue
+#                     #setting new index
+#                     index = set_start_index + 1
+#                     set_start_index = index
+#                     files_in_set = 0
+#                     stack.clear()
+#                     sets_arr = []
+#                     print("\n\n\n")
+#                     continue
             
-            else:   #if not 30 min apart or continuous dates
-                set_start_index = index
-                files_in_set = 0
-                stack.clear()
-                sets_arr = []
+#             else:   #if not 30 min apart or continuous dates
+#                 set_start_index = index
+#                 files_in_set = 0
+#                 stack.clear()
+#                 sets_arr = []
         
       
-        stack.append(day)
-        index += 1
-
+#         stack.append(day)
+#         index += 1
+    a = is_30_min_apart('23:45','00:15') 
+    b = same_or_one_day_apart(  "2023-06-30", "2023-07-01")
+    print(a and b)
         
