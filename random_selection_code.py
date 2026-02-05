@@ -120,7 +120,7 @@
 import numpy as np
 
 def compute_weighted_selection(
-    npz_path,
+    npz_dict,
     num_to_select,
     base_threshold=0.5,
     better_value=2.5,
@@ -133,13 +133,13 @@ def compute_weighted_selection(
     minimum_probability=0.1,
     max_possible_score=48
 ):
-    data = np.load(npz_path, allow_pickle=True)
-    dl = len(data['array'])
+   
+    dl = len(npz_dict['array'])
 
     high = {}
     low = {}
 
-    for i, sets in enumerate(data['array']):
+    for i, sets in enumerate(npz_dict['array']):
         t = []
         c = 0
         check = 0

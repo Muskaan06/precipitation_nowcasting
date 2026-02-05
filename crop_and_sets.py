@@ -4,10 +4,9 @@ import re
 from datetime import datetime
 from pathlib import Path
 import os
-import matplotlib.pyplot as plt
-from matplotlib.colors import LogNorm
 from datetime import datetime, timedelta
 import time
+from random_selection_code import compute_weighted_selection
 # from random_selection_code import weighted_selection_without_replacement
 
 def extract_datetime_from_path(path):
@@ -134,7 +133,7 @@ if __name__ == "__main__":
     sets_arr = []           #current set keeping cropped files
     i=0                     #counts set no
     multiset = []           #store multiple sets together (default=10)
-    mulit_metadata = dict() #stores multiple metadatas
+    mulit_metadata = [] #stores multiple metadatas
 
     while index < len(time_files):
         day = time_files[index]  
@@ -176,21 +175,38 @@ if __name__ == "__main__":
                         print("This is set no: ",i)
                         print(sets_arr.shape)
                         print(metadata)
-                        mulit_metadata[f"set{i}"] = metadata
+                        mulit_metadata.append(metadata)
                         i += 1
                         #write saving code
                         if len(multiset) == 10:
                             multiset = np.stack(multiset, axis=0)
-                            np.savez(
-                                f"../datasets/set{i-10}-{i}.npz",
-                                array=multiset,
-                                metadata=mulit_metadata
-                            )
                             print(multiset.shape)
-                            multiset = []
-                            mulit_metadata.clear()
-                            time.sleep(10)
+                            print(mulit_metadata)
+                            temp_dict = {
+                                "array": multiset,
+                                "metadata": mulit_metadata}
                             # random selection
+                            # selected_indices = weighted_selection_without_replacement(multiset, mulit_metadata, num_to_select=5)
+                            selected_indices = compute_weighted_selection(temp_dict, num_to_select=10)
+                            print(f"Selected Set Indices: {selected_indices}")
+                            for idx in selected_indices:
+                                #file name: IMC_{start_date}_{start_time}_to_{end_date}_{end_time}.npz
+                                sdate = mulit_metadata[idx]["start_date"]
+                                stime = mulit_metadata[idx]["start_time"]
+                                edate = mulit_metadata[idx]["end_date"]
+                                etime = mulit_metadata[idx]["end_time"]
+                                f_name = f"IMC_{sdate}_{stime}_to_{edate}_{etime}.npz"
+                                print(f"Saving file: {f_name}")
+                                np.savez(
+                                    f"../datasets/selected_sets/{f_name}",
+                                    array=multiset,
+                                    metadata=mulit_metadata[idx]
+                                )
+                            
+                            multiset = []
+                            mulit_metadata = []
+                            time.sleep(10)
+                            
                             
                             # break
 
