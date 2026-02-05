@@ -31,7 +31,14 @@ def extract_datetime_from_path(path):
 
 def is_30_min_apart(t1, t2):
     fmt = "%H:%M"
-    return datetime.strptime(t2, fmt) - datetime.strptime(t1, fmt) == timedelta(minutes=30)
+    d1 = datetime.strptime(t1, fmt)
+    d2 = datetime.strptime(t2, fmt)
+
+    # handle midnight rollover
+    if d2 < d1:
+        d2 += timedelta(days=1)
+
+    return d2 - d1 == timedelta(minutes=30)
 
 def cropping(file_path):
     with h5py.File(file_path, "r") as f:
@@ -205,5 +212,7 @@ if __name__ == "__main__":
       
         stack.append(day)
         index += 1
-
+    # a = is_30_min_apart('23:45','01:15') 
+    # b = same_or_one_day_apart(  "2023-06-30", "2023-07-01")
+    # print(a and b)
         
