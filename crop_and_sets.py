@@ -199,7 +199,7 @@ if __name__ == "__main__":
                                 print(f"Saving file: {f_name}")
                                 np.savez(
                                     f"../datasets/selected_sets/{f_name}",
-                                    array=multiset,
+                                    array=multiset[idx],
                                     metadata=mulit_metadata[idx]
                                 )
                             
