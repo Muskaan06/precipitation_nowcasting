@@ -117,15 +117,31 @@ def same_or_one_day_apart(d1, d2):
     d2 = datetime.strptime(d2, "%Y-%m-%d")
     return abs((d1 - d2).days) <= 1
 
+def saving_code(selected_indices):
+    for idx in selected_indices:
+        #file name: IMC_{start_date}_{start_time}_to_{end_date}_{end_time}.npz
+        sdate = mulit_metadata[idx]["start_date"]
+        stime = mulit_metadata[idx]["start_time"]
+        edate = mulit_metadata[idx]["end_date"]
+        etime = mulit_metadata[idx]["end_time"]
+        f_name = f"IMC_{sdate}_{stime}_to_{edate}_{etime}.npz"
+        print(f"Saving file: {f_name}")
+        np.savez(
+            f"../datasets/selected_sets/{f_name}",
+            array=multiset[idx],
+            metadata=mulit_metadata[idx]
+        )
+        
 if __name__ == "__main__":
 
-    dir_path = "../datasets/3RIMG_L2B_IMC/2023/cont_set_1" 
+    dir_path = "../datasets/3RIMG_L2B_IMC/2023/cont_set_3" 
 
     # for day in os.listdir(year_dir_path)[:3]:       #day = [cont_set_1, cont_set_2, cont_set_3]
        
     count = 0
-    time_files = sorted(os.listdir(dir_path))   #[file1.h5,....]
-
+    # time_files = sorted(os.listdir(dir_path))   #[file1.h5,....]
+    time_files = sorted(os.listdir(dir_path), key=lambda x: datetime.strptime(re.search(r'(\d{2}[A-Z]{3}\d{4}_\d{4})', x).group(1), "%d%b%Y_%H%M"))
+    print(len(time_files))
     index = 0
     set_start_index = 0
     files_in_set = 0        #to keep count of number of file in set
@@ -137,8 +153,8 @@ if __name__ == "__main__":
 
     while index < len(time_files):
         day = time_files[index]  
-        file_path = dir_path + '/' + day        
-        print("file name: ",file_path)
+        file_path = dir_path + '/' + day      
+        # print(f"{index} file name:{file_path} ")
         # print("current index: ", index)
         # print("no of file in current set: ", files_in_set)
         # print("start time: ",time_files[set_start_index])
@@ -155,7 +171,7 @@ if __name__ == "__main__":
                 #condition 2: 30 min apart but between last day of this month and next day of next month  
             if (is_30_min_apart(prev_time, t)) and (same_or_one_day_apart(d[0], prev_day[0])):        
                 if files_in_set < 24:                  
-                    
+                    print(f"{index} Adding file to current set: {file_path}")
                     cropped_file = cropping(file_path)
                     sets_arr.append(cropped_file)
                     files_in_set += 1
@@ -189,20 +205,7 @@ if __name__ == "__main__":
                             # selected_indices = weighted_selection_without_replacement(multiset, mulit_metadata, num_to_select=5)
                             selected_indices = compute_weighted_selection(temp_dict, num_to_select=10)
                             print(f"Selected Set Indices: {selected_indices}")
-                            for idx in selected_indices:
-                                #file name: IMC_{start_date}_{start_time}_to_{end_date}_{end_time}.npz
-                                sdate = mulit_metadata[idx]["start_date"]
-                                stime = mulit_metadata[idx]["start_time"]
-                                edate = mulit_metadata[idx]["end_date"]
-                                etime = mulit_metadata[idx]["end_time"]
-                                f_name = f"IMC_{sdate}_{stime}_to_{edate}_{etime}.npz"
-                                print(f"Saving file: {f_name}")
-                                np.savez(
-                                    f"../datasets/selected_sets/{f_name}",
-                                    array=multiset[idx],
-                                    metadata=mulit_metadata[idx]
-                                )
-                            
+                            saving_code(selected_indices)
                             multiset = []
                             mulit_metadata = []
                             time.sleep(10)
@@ -220,12 +223,36 @@ if __name__ == "__main__":
                     continue
             
             else:   #if not 30 min apart or continuous dates
-                set_start_index = index
+                #check if past set has 24 files, if yes create metadata and add to multiset
+                if len(sets_arr) == 24:
+                    multiset.append(sets_arr)
+                    sets_arr = np.stack(sets_arr, axis=0)
+                    print(prev_time)
+                    begin_day, begin_time = extract_datetime_from_path(time_files[set_start_index])[0], extract_datetime_from_path(time_files[set_start_index])[1]
+                    metadata = {
+                        "start_date":begin_day[0],
+                        "end_date":prev_day[0],
+                        "start_time": begin_time,
+                        "end_time": prev_time
+                    }
+                    print("This is set no: ",i)
+                    print(sets_arr.shape)
+                    print(metadata)
+                    mulit_metadata.append(metadata)
+                    i += 1
+                    #setting new index
+                    index = set_start_index + 1
+                else:
+                    set_start_index = index
                 files_in_set = 0
                 stack.clear()
                 sets_arr = []
         
-      
+        else:
+            print(f"Starting new set with file: {file_path}")
+            cropped_file = cropping(file_path)
+            sets_arr.append(cropped_file)
+            files_in_set += 1
         stack.append(day)
         index += 1
     # a = is_30_min_apart('23:45','01:15') 
