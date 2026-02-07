@@ -147,7 +147,7 @@ if __name__ == "__main__":
     files_in_set = 0        #to keep count of number of file in set
     stack = []              #to keep track of previous file
     sets_arr = []           #current set keeping cropped files
-    i=0                     #counts set no
+    i=0                     #counts multiset no
     multiset = []           #store multiple sets together (default=10)
     mulit_metadata = [] #stores multiple metadatas
 
@@ -188,30 +188,9 @@ if __name__ == "__main__":
                             "start_time": begin_time,
                             "end_time": prev_time
                         }
-                        print("This is set no: ",i)
                         print(sets_arr.shape)
                         print(metadata)
                         mulit_metadata.append(metadata)
-                        i += 1
-                        #write saving code
-                        if len(multiset) == 10:
-                            multiset = np.stack(multiset, axis=0)
-                            print(multiset.shape)
-                            print(mulit_metadata)
-                            temp_dict = {
-                                "array": multiset,
-                                "metadata": mulit_metadata}
-                            # random selection
-                            # selected_indices = weighted_selection_without_replacement(multiset, mulit_metadata, num_to_select=5)
-                            selected_indices = compute_weighted_selection(temp_dict, num_to_select=10)
-                            print(f"Selected Set Indices: {selected_indices}")
-                            saving_code(selected_indices)
-                            multiset = []
-                            mulit_metadata = []
-                            time.sleep(10)
-                            
-                            
-                            # break
 
                     #setting new index
                     index = set_start_index + 1
@@ -235,18 +214,37 @@ if __name__ == "__main__":
                         "start_time": begin_time,
                         "end_time": prev_time
                     }
-                    print("This is set no: ",i)
                     print(sets_arr.shape)
                     print(metadata)
                     mulit_metadata.append(metadata)
-                    i += 1
                     #setting new index
                     index = set_start_index + 1
                 else:
                     set_start_index = index
+                    
                 files_in_set = 0
                 stack.clear()
                 sets_arr = []
+
+            #write saving code
+            if len(multiset) == 10:
+                print(f"Multiset {i} ready for random selection!")
+                i += 1
+                multiset = np.stack(multiset, axis=0)
+                print(multiset.shape)
+                print(mulit_metadata)
+                temp_dict = {
+                    "array": multiset,
+                    "metadata": mulit_metadata}
+                # random selection
+                # selected_indices = weighted_selection_without_replacement(multiset, mulit_metadata, num_to_select=5)
+                selected_indices = compute_weighted_selection(temp_dict, num_to_select=10)
+                print(f"Selected Set Indices: {selected_indices}")
+                saving_code(selected_indices)
+                multiset = []
+                mulit_metadata = []
+                time.sleep(10)
+                    
         
         else:
             print(f"Starting new set with file: {file_path}")
