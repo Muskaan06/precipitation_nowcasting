@@ -10,4 +10,4 @@ def flatten_day_folders(parent_dir):
                 shutil.move(str(item), parent / item.name)
             day_folder.rmdir()
 
-flatten_day_folders('../datasets/3RIMG_L2B_IMC/2023/cont_set_3')
+flatten_day_folders('../datasets/3RIMG_L2B_IMC/2023')

@@ -133,7 +133,7 @@ def compute_weighted_selection(
     minimum_probability=0.1,
     max_possible_score=48
 ):
-   
+    print("-------------------------------------in random selection code!-----------------------------------")
     dl = len(npz_dict['array'])
 
     high = {}
@@ -148,10 +148,10 @@ def compute_weighted_selection(
             a = image[0] > base_threshold
             b = image[0] > better_value
 
-            if np.sum(b) / (112 * 112) >= better_percentage_threshold:
+            if np.sum(b) / (140 * 140) >= better_percentage_threshold:
                 c = 0
                 t.append(2)
-            elif np.sum(a) / (112 * 112) >= percentage_threshold:
+            elif np.sum(a) / (140 * 140) >= percentage_threshold:
                 c = 0
                 t.append(1)
             else:

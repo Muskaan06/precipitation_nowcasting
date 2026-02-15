@@ -5,7 +5,7 @@ import matplotlib.colors as colors
 from mpl_toolkits.basemap import Basemap
 
 # 1. Load and clean data
-file_path = "../datasets/3RIMG_L2B_IMC/2023/cont_set_1/3RIMG_16JUN2023_0215_L2B_IMC_V01R00.h5"
+file_path = "../datasets/3RIMG_L2B_IMC/2024/3RIMG_21JUL2024_1315_L2B_IMC_V01R00.h5"
 with h5py.File(file_path, "r") as f:
     rain = np.squeeze(f["IMC"][:]).astype(np.float32)
     lat  = f["Latitude"][:].astype(np.float32) / 100.0
@@ -26,12 +26,22 @@ if np.nanmean(lat[0, :]) > np.nanmean(lat[-1, :]):
     lon  = lon[::-1, :]
     rain = rain[::-1, :]
 
-# =====================================
-# 4. Convert to 4 km rainfall grid
-# =====================================
 
-lat_min, lat_max = 22, 30
-lon_min, lon_max = 90, 98
+# #for north eastern region
+# lat_min, lat_max = 22, 30
+# lon_min, lon_max = 90, 98
+
+# #for eastern region (JOWB)    
+# lat_min, lat_max = 18, 26
+# lon_min, lon_max = 82, 90
+
+# #for southern region   
+lat_min, lat_max = 8, 14
+lon_min, lon_max = 74, 80
+
+# for himalayan region
+# lat_min, lat_max = 26, 36
+# lon_min, lon_max = 72.0, 82.0
 
 # ~4 km resolution in degrees
 res = 8.0 / 111.0   # ≈ 0.036°
@@ -101,19 +111,19 @@ fig, ax = plt.subplots(figsize=(8, 8))  # ✅ square canvas
 # 5. Basemap
 m = Basemap(
    projection="cyl",
-   llcrnrlon=90,
-   urcrnrlon=98,
-   llcrnrlat=22,
-   urcrnrlat=30,
+   llcrnrlon=lon_min,
+   urcrnrlon=lon_max,
+   llcrnrlat=lat_min,
+   urcrnrlat=lat_max,
    resolution="l",
    ax=ax
 )
 
-#m.drawcoastlines(linewidth=1.2) 
-#m.drawcountries(linewidth=0.8) 
-#m.drawmapboundary(fill_color="lightcyan") 
-#m.drawstates(linewidth=0.8) 
-#m.fillcontinents(color="whitesmoke", lake_color="lightcyan")
+m.drawcoastlines(linewidth=1.2) 
+m.drawcountries(linewidth=0.8) 
+m.drawmapboundary(fill_color="lightcyan") 
+m.drawstates(linewidth=0.8) 
+m.fillcontinents(color="whitesmoke", lake_color="lightcyan")
 
 # ✅ Force square map geometry
 ax.set_aspect("equal", adjustable="box")
@@ -133,3 +143,4 @@ plt.colorbar(mesh, label="Rainfall Rate (mm/hr)", fraction=0.035, pad=0.02)
 plt.title("INSAT-3DR IMC Rainfall (Square Map)")
 
 plt.show()
+# fig.savefig("./data_images/INSAT_IMC_20FEB2024_0915_square_map.png", dpi=300, bbox_inches="tight") 
