@@ -59,7 +59,7 @@ import matplotlib.colors as colors
 
 # Load data
 data = np.load(
-    "../datasets/selected_sets/IMC_2023-06-01_07:45_to_2023-06-01_19:45.npz",
+    "/home/muskaan06/Desktop/Research/nowcasting/datasets/selected_sets_7_sisters/IMC_2024-03-30_22:15_to_2024-03-31_09:45.npz",
     allow_pickle=True
 )
 

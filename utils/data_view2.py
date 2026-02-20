@@ -5,7 +5,7 @@ import matplotlib.colors as colors
 from mpl_toolkits.basemap import Basemap
 
 # 1. Load and clean data
-file_path = "../datasets/3RIMG_L2B_IMC/2024/3RIMG_21JUL2024_1315_L2B_IMC_V01R00.h5"
+file_path = "/home/muskaan06/Desktop/Research/nowcasting/datasets/3RIMG_L2B_IMC/2024/3RIMG_21JUL2024_1315_L2B_IMC_V01R00.h5"
 with h5py.File(file_path, "r") as f:
     rain = np.squeeze(f["IMC"][:]).astype(np.float32)
     lat  = f["Latitude"][:].astype(np.float32) / 100.0
@@ -130,9 +130,9 @@ ax.set_aspect("equal", adjustable="box")
 
 # 6. Plot rainfall
 mesh = m.pcolormesh(
-   lon,
-   lat,
-   rain,
+   lon_bins,
+   lat_bins,
+   rain_grid,
    latlon=True,
    shading="auto",
    cmap="viridis",
