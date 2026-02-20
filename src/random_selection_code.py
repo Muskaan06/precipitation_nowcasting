@@ -148,10 +148,14 @@ def compute_weighted_selection(
             a = image[0] > base_threshold
             b = image[0] > better_value
 
-            if np.sum(b) / (140 * 140) >= better_percentage_threshold:
+            #140 * 140 for himalayan region
+            #112 *112 for north east and eastern region
+            #85 * 85 for South
+
+            if np.sum(b) / (112 * 112) >= better_percentage_threshold:
                 c = 0
                 t.append(2)
-            elif np.sum(a) / (140 * 140) >= percentage_threshold:
+            elif np.sum(a) / (112 * 112) >= percentage_threshold:
                 c = 0
                 t.append(1)
             else:

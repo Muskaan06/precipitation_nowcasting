@@ -68,8 +68,8 @@ def cropping(file_path):
     #     print(f"File read error (possibly EOF or corrupted file): {e}")
     #     return None
 
-    lat_min, lat_max = 26, 36
-    lon_min, lon_max = 72, 82
+    lat_min, lat_max = 18, 26
+    lon_min, lon_max = 82, 90
 
     valid = (
         (lat >= -90) & (lat <= 90) &
@@ -164,14 +164,14 @@ def saving_code(selected_indices, multiset, multiset_metadata):
         f_name = f"IMC_{sdate}_{stime}_to_{edate}_{etime}.npz"
         print(f"Saving file: {f_name}", "\n")
         np.savez(
-            f"../datasets/selected_sets_himalayan/{f_name}",
+            f"/home/muskaan06/Desktop/Research/nowcasting/datasets/selected_sets_JOWB/{f_name}",
             array=multiset[idx],
             metadata=multiset_metadata[idx]
         )
         
 if __name__ == "__main__":
 
-    dir_path = "../datasets/3RIMG_L2B_IMC/2024" 
+    dir_path = "/home/muskaan06/Desktop/Research/nowcasting/datasets/3RIMG_L2B_IMC/2024" 
     time_files = sorted(os.listdir(dir_path), key=lambda x: datetime.strptime(re.search(r'(\d{2}[A-Z]{3}\d{4}_\d{4})', x).group(1), "%d%b%Y_%H%M")) #list of file names sorted by date and time
     print(len(time_files))
 
