@@ -2,9 +2,9 @@ import torch
 import torch.nn as nn
 from torch.nn.utils import spectral_norm
 
-from src.models.nowcastnet.gan.gan_parts import L2_Block, L3_Block, Noise_Projector
-from src.models.nowcastnet.gan.unet_parts import DoubleConv, Down, OutConv, Up
-from src.models.nowcastnet.layers.generation.generative_network import Generative_Decoder, Generative_Encoder
+from model.nowcastnet.gan.gan_parts import L2_Block, L3_Block, Noise_Projector
+from model.nowcastnet.gan.unet_parts import DoubleConv, Down, OutConv, Up
+from model.nowcastnet.layers.generation.generative_network import Generative_Decoder, Generative_Encoder
 
 ni = 192  # size of image
 ndf = 32  # size of discriminator feature map

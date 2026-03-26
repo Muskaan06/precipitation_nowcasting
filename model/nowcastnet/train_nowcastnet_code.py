@@ -33,26 +33,28 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader, random_split
+from tqdm import tqdm
+import sys
+sys.path.append('/home/muskaan06/Desktop/Research/nowcasting/precipitation_nowcasting')
 
 from pysteps import motion as pysteps_motion
 from pysteps.utils import conversion, transformation
 
 from model.nowcastnet.nowcastnet_model_code import NowcasnetGenerator, TemporalDiscriminator
 
-
 # ------------------------------------------------------------------------------
 # CONFIG
 # ------------------------------------------------------------------------------
 CFG = {
-    "data_dir":         "data/rainfall_npz",
+    "data_dir":         "/home/muskaan06/Desktop/Research/nowcasting/datasets/selected_sets_2024_SI_112",
     "npz_key":          None,
-    "input_len":        4,          # raw context frames
-    "output_len":       6,          # target / evo-prediction frames
+    "input_len":        4,
+    "output_len":       6,
     "rain_channel":     0,          # ch0 = rain (mm/hr)
     "img_size":         112,
-    "motion_method":    "lk",       # pysteps method: "lk" or "darts"
+    "motion_method":    "lk",
     "latent_dim":       32,
-    "h_noise":          8,          # noise map spatial size
+    "h_noise":          8,
     "alpha":            6.0,        # adversarial loss weight
     "beta":             20.0,       # grid-cell loss weight
     "glr":              2e-4,
@@ -63,7 +65,7 @@ CFG = {
     "batch_size":       8,
     "generation_steps": 1,
     "seed":             42,
-    "num_workers":      4,
+    "num_workers":      0,          # 0 avoids shared-memory issues with npz
     "save_dir":         "checkpoints/nowcastnet",
     "csi_thresholds":   [0.1, 1.0, 5.0, 10.0],
     "device": "cuda" if torch.cuda.is_available() else "cpu",
@@ -78,8 +80,8 @@ class RainfallNPZDataset(Dataset):
     """
     Each .npz = one set, shape (24, 3, H, W).
     Returns:
-        X : (input_len,  3, H, W)  float32  — context frames
-        Y : (output_len, 3, H, W)  float32  — target frames
+        X : (input_len,  H, W)  float32  — rain channel context frames
+        Y : (output_len, H, W)  float32  — rain channel target frames
     """
     def __init__(self, file_paths, input_len=4, output_len=6, npz_key=None):
         self.file_paths = file_paths
@@ -97,11 +99,19 @@ class RainfallNPZDataset(Dataset):
         return len(self.file_paths)
 
     def __getitem__(self, idx):
-        n = np.load(self.file_paths[idx])
-        s = n[self.npz_key].astype(np.float32)
-        n.close()
-        return (torch.from_numpy(s[:self.input_len]),
-                torch.from_numpy(s[self.input_len:self.input_len + self.output_len]))
+        with np.load(self.file_paths[idx]) as n:
+            # .copy() prevents memory-map resize errors in DataLoader workers
+            arr = n[self.npz_key].copy().astype(np.float32)
+
+        # FIX 1: replace NaNs (no-rain pixels) with 0 before any processing
+        arr = np.nan_to_num(arr, nan=0.0)
+
+        # extract rain channel only: (T, H, W)
+        rain = arr[:, 0, :, :]
+
+        X = torch.from_numpy(rain[:self.input_len])
+        Y = torch.from_numpy(rain[self.input_len:self.input_len + self.output_len])
+        return X, Y
 
 
 def build_dataloaders(cfg):
@@ -127,7 +137,7 @@ def build_dataloaders(cfg):
 
 
 # ------------------------------------------------------------------------------
-# EVOLUTION NETWORK  (pysteps LK — mirrors save_intensities_and_motion_hdf.py)
+# EVOLUTION NETWORK  (pysteps LK)
 # ------------------------------------------------------------------------------
 
 _ZR_A   = 223.0
@@ -137,7 +147,7 @@ _THRESH = 0.1
 
 
 def _to_dbz(rain_np: np.ndarray) -> np.ndarray:
-    """(T, H, W) mm/hr -> dBZ, matching save_intensities_and_motion_hdf.py."""
+    """(T, H, W) mm/hr -> dBZ."""
     meta = {"transform": None, "zerovalue": _ZERO, "threshold": _THRESH, "unit": "mm/h"}
     rr, m2 = conversion.to_rainrate(rain_np, meta, zr_a=_ZR_A, zr_b=_ZR_B)
     dbz, _ = transformation.dB_transform(rr, m2)
@@ -152,41 +162,38 @@ def _grid_cpu(H: int, W: int) -> torch.Tensor:
 
 
 def compute_evo_prediction(
-    rain_context: torch.Tensor,   # (B, input_len, H, W)  mm/hr
+    rain_context: torch.Tensor,   # (B, input_len, H, W) mm/hr
     output_len: int,
     method: str = "lk",
 ) -> torch.Tensor:
-    """
-    Linear-persistence evolution prediction via pysteps LK optical flow.
-
-    Steps (per sample in the batch):
-        1. Convert context frames to dBZ
-        2. Run pysteps LK -> motion field (2, H, W)
-        3. Warp last context frame with the motion field
-        4. Repeat the warped frame output_len times
-
-    Returns: (B, output_len, H, W)  mm/hr, same device as input.
-    """
+    """Linear-persistence evolution prediction via pysteps LK optical flow."""
     B, T, H, W = rain_context.shape
-    dev        = rain_context.device
-    rain_np    = rain_context.detach().cpu().numpy()
-    oflow      = pysteps_motion.get_method(method)
-    grid       = _grid_cpu(H, W)
+    dev     = rain_context.device
+    rain_np = rain_context.detach().cpu().numpy()
+    oflow   = pysteps_motion.get_method(method)
+    grid    = _grid_cpu(H, W)
 
     evo_list = []
     for b in range(B):
-        dbz    = _to_dbz(rain_np[b])                                            # (T,H,W)
-        mf     = torch.from_numpy(oflow(dbz).astype(np.float32)).unsqueeze(0)  # (1,2,H,W)
-        X0     = torch.from_numpy(rain_np[b, -1]).unsqueeze(0).unsqueeze(0)    # (1,1,H,W)
+        try:
+            dbz = _to_dbz(rain_np[b])                                               # (T,H,W)
+            mf  = torch.from_numpy(oflow(dbz).astype(np.float32)).unsqueeze(0)      # (1,2,H,W)
+        except Exception:
+            # fallback: repeat last frame if optical flow fails (e.g. all zeros)
+            last = torch.from_numpy(rain_np[b, -1])
+            evo_list.append(last.expand(output_len, -1, -1))
+            continue
+
+        X0     = torch.from_numpy(rain_np[b, -1]).unsqueeze(0).unsqueeze(0)         # (1,1,H,W)
         vg     = grid.clone() - mf
         vg[:, 0] = 2.0 * vg[:, 0] / max(W - 1, 1) - 1.0
         vg[:, 1] = 2.0 * vg[:, 1] / max(H - 1, 1) - 1.0
         warped = F.grid_sample(X0, vg.permute(0, 2, 3, 1),
                                mode="bilinear", padding_mode="zeros",
-                               align_corners=True).squeeze(0)                   # (1,H,W)
-        evo_list.append(warped.expand(output_len, -1, -1))                      # (T,H,W)
+                               align_corners=True).squeeze(0)                        # (1,H,W)
+        evo_list.append(warped.expand(output_len, -1, -1))                           # (T,H,W)
 
-    return torch.stack(evo_list, dim=0).to(dev)                                 # (B,T,H,W)
+    return torch.stack(evo_list, dim=0).to(dev)                                      # (B,T,H,W)
 
 
 # ------------------------------------------------------------------------------
@@ -207,12 +214,13 @@ class CSIMetric:
 
     @torch.no_grad()
     def update(self, pred: torch.Tensor, target: torch.Tensor):
-        """pred, target: (B, T, H, W) or (B, H, W) in mm/hr."""
-        if pred.dim() == 4:
-            pred   = pred.mean(dim=1)
-            target = target.mean(dim=1)
+        """
+        pred, target: (B, T, H, W) mm/hr.
+        FIX 2: threshold each frame independently, do NOT average before thresholding.
+        Averaging mm/hr values before thresholding destroys high-threshold signals.
+        """
         for t in self.thresholds:
-            p = pred   >= t
+            p = pred   >= t   # (B, T, H, W) bool
             q = target >= t
             self._tp[t] += ( p &  q).sum().item()
             self._fp[t] += ( p & ~q).sum().item()
@@ -231,11 +239,7 @@ class CSIMetric:
 # ------------------------------------------------------------------------------
 
 def adversarial_loss(y_hat: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
-    """
-    BCE with logits — numerically stable, no [0,1] requirement on y_hat.
-    y_hat : raw logits from discriminator  (any range)
-    y     : labels in {0, 1}
-    """
+    """BCE with logits — numerically stable."""
     return F.binary_cross_entropy_with_logits(y_hat, y)
 
 
@@ -244,10 +248,6 @@ def grid_cell_regularizer(
     batch_targets:     torch.Tensor,   # (B, T, H, W)
     generation_steps:  int,
 ) -> torch.Tensor:
-    """
-    Grid-cell regularizer from lightning.py.
-    MaxPool2d applied directly to (B, T, H, W) treating T as channels.
-    """
     mp     = nn.MaxPool2d(kernel_size=5, stride=2)
     pooled = [mp(generated_samples[i]) for i in range(generation_steps)]
     x_pred = torch.mean(torch.stack(pooled, dim=0), dim=0)
@@ -274,64 +274,50 @@ def run_epoch(
     opt_g, opt_d,
     device, cfg,
     training: bool = True,
+    epoch: int = 0,
+    split: str = "train",
 ) -> dict:
     generator.train(training)
     discriminator.train(training)
     csi_metric.reset()
 
     totals, n_batches = {}, 0
-    rain_ch    = cfg["rain_channel"]
-    gen_steps  = cfg["generation_steps"]
     output_len = cfg["output_len"]
     alpha      = cfg["alpha"]
     beta       = cfg["beta"]
-    _first     = True
+    gen_steps  = cfg["generation_steps"]
 
     ctx = torch.enable_grad() if training else torch.no_grad()
     with ctx:
-        for X, Y in loader:
+        # tqdm progress bar per batch
+        pbar = tqdm(loader, desc=f"Epoch {epoch:03d} [{split:5s}]", leave=False)
+        for X, Y in pbar:
+            # X: (B, input_len, H, W), Y: (B, output_len, H, W) — rain only, NaN-free
             X, Y = X.to(device), Y.to(device)
+            B    = X.shape[0]
 
-            # Extract rain channel -> (B, T, H, W)
-            rain_X = X[:, :, rain_ch, :, :] if X.dim() == 5 else X
-            rain_Y = Y[:, :, rain_ch, :, :] if Y.dim() == 5 else Y
-
-            if _first:
-                print(f"[run_epoch] rain_X={rain_X.shape}  rain_Y={rain_Y.shape}")
-                _first = False
-
-            B = rain_X.shape[0]
-
-            # Evolution prediction: pysteps LK warp, no data leakage
+            # evolution prediction via optical flow (no gradient, no data leakage)
             with torch.no_grad():
-                evo_pred = compute_evo_prediction(
-                    rain_X, output_len, method=cfg["motion_method"]
-                )   # (B, output_len, H, W)
+                evo_pred = compute_evo_prediction(X, output_len, method=cfg["motion_method"])
 
-            # Build x_before = cat(raw_context, evo_prediction)  (B, 10, H, W)
-            # Matches lightning.py: x_before = cat([inputs[k] for k in inputs])
-            # Generator extracts evo signal as x[:, -n_after:] internally.
-            x_before = torch.cat([rain_X, evo_pred], dim=1)
-            x_after  = rain_Y
+            # x_before = cat(context, evo_prediction): (B, input_len+output_len, H, W)
+            x_before = torch.cat([X, evo_pred], dim=1)
+            x_after  = Y
 
-            # Discriminator real sequence: cat(raw_context, real_target)
-            real  = torch.cat([rain_X, x_after], dim=1)
+            real  = torch.cat([X, x_after], dim=1)
             valid = torch.ones( B, 1, device=device, dtype=x_before.dtype)
             fake  = torch.zeros(B, 1, device=device, dtype=x_before.dtype)
 
             # ── Generator step ─────────────────────────────────────────────────
             if training:
                 opt_g.zero_grad()
-                opt_d.zero_grad()
 
-            preds             = [_gen_forward(generator, x_before, cfg)
-                                 for _ in range(gen_steps)]
-            generated_samples = torch.stack(preds, dim=0)   # (gen_steps, B, T, H, W)
+            preds             = [_gen_forward(generator, x_before, cfg) for _ in range(gen_steps)]
+            generated_samples = torch.stack(preds, dim=0)           # (gen_steps, B, T, H, W)
 
             disc_scores = torch.stack([
                 adversarial_loss(
-                    discriminator(torch.cat([rain_X, generated_samples[i]], dim=1)),
-                    valid
+                    discriminator(torch.cat([X, generated_samples[i]], dim=1)), valid
                 ) for i in range(gen_steps)
             ])
             g_adv = disc_scores.mean()
@@ -349,7 +335,7 @@ def run_epoch(
 
             with torch.no_grad():
                 fake_pred = _gen_forward(generator, x_before, cfg)
-            fake_seq = torch.cat([rain_X, fake_pred], dim=1).detach()
+            fake_seq = torch.cat([X, fake_pred], dim=1).detach()
 
             real_loss = adversarial_loss(discriminator(real),     valid)
             fake_loss = adversarial_loss(discriminator(fake_seq), fake)
@@ -360,17 +346,25 @@ def run_epoch(
                 torch.nn.utils.clip_grad_norm_(discriminator.parameters(), 1.0)
                 opt_d.step()
 
-            # ── CSI ────────────────────────────────────────────────────────────
+            # ── CSI (per frame, not averaged) ──────────────────────────────────
             with torch.no_grad():
                 csi_metric.update(generated_samples.mean(0).detach(), x_after)
 
             for k, v in {
                 "g_loss": g_tot.item(), "g_adv": g_adv.item(), "cell": cell.item(),
-                "d_loss": d_loss.item(), "d_real": real_loss.item(),
-                "d_fake": fake_loss.item(),
+                "d_loss": d_loss.item(), "d_real": real_loss.item(), "d_fake": fake_loss.item(),
             }.items():
                 totals[k] = totals.get(k, 0.0) + v
             n_batches += 1
+
+            # update tqdm bar with current batch losses and CSI@1.0
+            pbar.set_postfix({
+                "g": f"{g_tot.item():.3f}",
+                "d": f"{d_loss.item():.3f}",
+                "cell": f"{cell.item():.3f}",
+            })
+
+        pbar.close()
 
     avg = {k: v / n_batches for k, v in totals.items()}
     avg.update(csi_metric.compute())
@@ -396,7 +390,6 @@ def main():
 
     train_loader, val_loader, test_loader = build_dataloaders(CFG)
 
-    # channel_in = input_len + output_len (raw context + evo prediction)
     channel_in = CFG["input_len"] + CFG["output_len"]
 
     generator = NowcasnetGenerator(
@@ -414,27 +407,34 @@ def main():
     nd = sum(p.numel() for p in discriminator.parameters() if p.requires_grad)
     print(f"[model] Generator: {ng:,}  Discriminator: {nd:,}")
 
-    opt_g = torch.optim.Adam(generator.parameters(),
-                             lr=CFG["glr"], betas=(CFG["b1"], CFG["b2"]))
-    opt_d = torch.optim.Adam(discriminator.parameters(),
-                             lr=CFG["dlr"], betas=(CFG["b1"], CFG["b2"]))
+    opt_g = torch.optim.Adam(generator.parameters(),     lr=CFG["glr"], betas=(CFG["b1"], CFG["b2"]))
+    opt_d = torch.optim.Adam(discriminator.parameters(), lr=CFG["dlr"], betas=(CFG["b1"], CFG["b2"]))
 
     csi = CSIMetric(CFG["csi_thresholds"])
     os.makedirs(CFG["save_dir"], exist_ok=True)
     best_g = float("inf")
     best_p = os.path.join(CFG["save_dir"], "best_generator.pt")
 
-    for epoch in range(1, CFG["num_epochs"] + 1):
+    # epoch-level progress bar
+    epoch_pbar = tqdm(range(1, CFG["num_epochs"] + 1), desc="Training", unit="epoch")
+    for epoch in epoch_pbar:
         tr = run_epoch(generator, discriminator, train_loader,
-                       csi, opt_g, opt_d, device, CFG, training=True)
+                       csi, opt_g, opt_d, device, CFG, training=True,  epoch=epoch, split="train")
         va = run_epoch(generator, discriminator, val_loader,
-                       csi, opt_g, opt_d, device, CFG, training=False)
+                       csi, opt_g, opt_d, device, CFG, training=False, epoch=epoch, split="val")
 
-        print(f"\n[Epoch {epoch:03d}/{CFG['num_epochs']}]")
-        print(f"  TRAIN  loss: {_fmt({k:v for k,v in tr.items() if not k.startswith('csi')})}")
-        print(f"         CSI:  {_fmt({k:v for k,v in tr.items() if     k.startswith('csi')})}")
-        print(f"  VAL    loss: {_fmt({k:v for k,v in va.items() if not k.startswith('csi')})}")
-        print(f"         CSI:  {_fmt({k:v for k,v in va.items() if     k.startswith('csi')})}")
+        # update epoch bar with key metrics
+        epoch_pbar.set_postfix({
+            "tr_g": f"{tr['g_loss']:.3f}",
+            "va_g": f"{va['g_loss']:.3f}",
+            "csi@1": f"{va.get('csi@1.0', float('nan')):.3f}",
+        })
+
+        tqdm.write(f"\n[Epoch {epoch:03d}/{CFG['num_epochs']}]")
+        tqdm.write(f"  TRAIN  loss: {_fmt({k:v for k,v in tr.items() if not k.startswith('csi')})}")
+        tqdm.write(f"         CSI:  {_fmt({k:v for k,v in tr.items() if     k.startswith('csi')})}")
+        tqdm.write(f"  VAL    loss: {_fmt({k:v for k,v in va.items() if not k.startswith('csi')})}")
+        tqdm.write(f"         CSI:  {_fmt({k:v for k,v in va.items() if     k.startswith('csi')})}")
 
         torch.save({
             "epoch":         epoch,
@@ -449,12 +449,12 @@ def main():
         if va["g_loss"] < best_g:
             best_g = va["g_loss"]
             torch.save(generator.state_dict(), best_p)
-            print(f"  ✓ New best {best_g:.4f}  ->  {best_p}")
+            tqdm.write(f"  ✓ New best {best_g:.4f}  ->  {best_p}")
 
     print("\n[test] Loading best generator ...")
     generator.load_state_dict(torch.load(best_p, map_location=device))
     te = run_epoch(generator, discriminator, test_loader,
-                   csi, opt_g, opt_d, device, CFG, training=False)
+                   csi, opt_g, opt_d, device, CFG, training=False, epoch=0, split="test")
     print(f"[test] loss: {_fmt({k:v for k,v in te.items() if not k.startswith('csi')})}")
     print(f"[test] CSI:  {_fmt({k:v for k,v in te.items() if     k.startswith('csi')})}")
 

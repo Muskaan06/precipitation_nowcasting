@@ -8,7 +8,7 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 from torch.utils.data import DataLoader, Dataset
 
 from earthformer import EarthformerModel
-from csi_eval import soft_csi_loss, hard_csi
+from precipitation_nowcasting.model.nowcastnet.csi_eval import soft_csi_loss, hard_csi
 
 
 class NPZDataset(Dataset):

@@ -15,6 +15,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.utils import spectral_norm as sn
 
+
 from model.nowcastnet.gan.model import NowcasnetGenerator as _NowcasnetGenerator
 from model.nowcastnet.gan.gan_parts import L2_Block
 

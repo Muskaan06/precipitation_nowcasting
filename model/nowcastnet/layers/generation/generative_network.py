@@ -1,8 +1,8 @@
 import torch.nn as nn
 import torch.nn.functional as F
 
-from src.models.nowcastnet.layers.evolution.module import DoubleConv, Down
-from src.models.nowcastnet.layers.generation.module import GenBlock
+from model.nowcastnet.layers.evolution.module import DoubleConv, Down
+from model.nowcastnet.layers.generation.module import GenBlock
 
 
 class Generative_Encoder(nn.Module):
