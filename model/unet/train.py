@@ -30,7 +30,7 @@ class NPZDataset(Dataset):
 
 
 class UNetLightning(pl.LightningModule):
-    def __init__(self, lr=1e-4, weight_decay=0.0):
+    def __init__(self, lr=1e-4, weight_decay=1e-5):
         super().__init__()
         self.save_hyperparameters()
         self.model   = UNet(channels_in=12, channels_out=18)
@@ -69,6 +69,7 @@ def main(args):
         devices=args.devices,
         callbacks=[ModelCheckpoint(monitor="val_loss", filename="unet-best-{epoch}", save_top_k=3, mode="min")],
     )
+    
     trainer.fit(UNetLightning(lr=args.lr), train_loader, val_loader)
 
 
@@ -77,10 +78,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--data_dir",    "-d",  required=True, type=str)
     parser.add_argument("--train_split", "-ts", default=0.7,   type=float)
-    parser.add_argument("--batch_size",  "-bs", default=4,     type=int)
-    parser.add_argument("--num_workers", "-nw", default=4,     type=int)
-    parser.add_argument("--max_epochs",  "-e",  default=50,    type=int)
+    parser.add_argument("--batch_size",  "-bs", default=2,     type=int)
+    parser.add_argument("--num_workers", "-nw", default=2,     type=int)
+    parser.add_argument("--max_epochs",  "-e",  default=5,    type=int)
     parser.add_argument("--devices",     "-dv", default=1,     type=int)
     parser.add_argument("--lr",          "-lr", default=1e-4,  type=float)
+    parser.add_argument("--weight_decay", "-wd", default=1e-5,  type=float)
     args = parser.parse_args()
     main(args)
