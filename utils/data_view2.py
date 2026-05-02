@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 from mpl_toolkits.basemap import Basemap
 
+
 # 1. Load and clean data
 file_path = "/home/muskaan06/Desktop/Research/nowcasting/datasets/3RIMG_L2B_IMC/2024/3RIMG_21JUL2024_1315_L2B_IMC_V01R00.h5"
 with h5py.File(file_path, "r") as f:

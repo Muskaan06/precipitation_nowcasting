@@ -1,65 +1,11 @@
-# import numpy as np
-# import matplotlib.pyplot as plt
-# import matplotlib.colors as colors
-
-# Load data
-# data = np.load("../datasets/selected_sets/IMC_2023-06-01_06:15_to_2023-06-01_18:15.npz", allow_pickle=True)
-
-# print(data["array"].shape)
-# print(data["metadata"])
-
-# set0 = data["array"][6]
-# print("\nset shape: ", set0.shape)
-
-
-# #each file inside a set
-# file1 = set0[0]
-# # print(file1)
-# print(file1[0].shape)
-
-
-# rain = file1[0]   # (N, N)
-# lat  = file1[1][:, 0]    # (N,)
-# lon  = file1[2][0, :]    # (N,)
-# print(rain)
-# # ---- SHOW SHAPES ----
-# print("NPZ file contents and shapes:")
-# print(f"rain shape: {rain.shape}")
-# print(f"lat  shape: {lat.shape}")
-# print(f"lon  shape: {lon.shape}")
-# print("-" * 40)
-
-# # Create 2D lat/lon grids
-# lon2d, lat2d = np.meshgrid(lon, lat)
-
-# print(f"lon2d shape: {lon2d.shape}")
-# print(f"lat2d shape: {lat2d.shape}")
-
-# # Plot
-# plt.figure(figsize=(8, 8))
-# plt.pcolormesh(
-#     lon,
-#     lat,
-#     rain,
-#     shading="auto",
-#     cmap="viridis",
-#     norm=colors.LogNorm(vmin=0.1, vmax=50)
-# )
-
-# plt.colorbar(label="Rainfall Rate (mm/hr)")
-# plt.xlabel("Longitude")
-# plt.ylabel("Latitude")
-# plt.title("INSAT-3DR IMC Rainfall (4 km Grid)")
-# plt.gca().set_aspect("equal", adjustable="box")
-# plt.show()
-
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 
 # Load data
+
 data = np.load(
-    "/home/muskaan06/Desktop/Research/nowcasting/datasets/selected_sets_7_sisters/IMC_2024-03-30_22:15_to_2024-03-31_09:45.npz",
+    "/mnt/sda1/Muskaan/nowcast/precipitation_nowcasting/dataset/small_data/northeastern/selected_sets_2021_7_Sisters_IMC_2021-05-31_22_45_to_2021-06-01_10_15.npz",
     allow_pickle=True
 )
 
@@ -74,6 +20,8 @@ rows = (T + cols - 1) // cols
 fig, axes = plt.subplots(rows, cols, figsize=(4 * cols, 4 * rows))
 axes = axes.flatten()
 
+norm = colors.SymLogNorm(linthresh=10, linscale=1, vmin=0, vmax=100)
+
 for t in range(T):
     rain = arr[t, 0]          # (112, 112)
     lat  = arr[t, 1][:, 0]    # (112,)
@@ -85,17 +33,23 @@ for t in range(T):
         rain,
         shading="auto",
         cmap="viridis",
-        norm=colors.LogNorm(vmin=0.1, vmax=50)
+        norm=norm
     )
-    axes[t].set_title(f"t={t}")
+    axes[t].set_title(f"t={t}", fontsize=9)
     axes[t].set_aspect("equal", adjustable="box")
-    axes[t].set_xlabel("Lon")
-    axes[t].set_ylabel("Lat")
+    axes[t].set_xticks([])
+    axes[t].set_yticks([])
 
 for i in range(t + 1, len(axes)):
     axes[i].axis("off")
 
-fig.colorbar(im, ax=axes, fraction=0.02, pad=0.04)
-plt.tight_layout()
+plt.suptitle("Precipitation Time Series", fontsize=13)
+plt.tight_layout(rect=[0, 0, 0.93, 1])  # leave right margin for colorbar
+
+cbar_ax = fig.add_axes([0.95, 0.1, 0.015, 0.8])  # [left, bottom, width, height]
+cbar = fig.colorbar(im, cax=cbar_ax)
+cbar.set_label("Precipitation (mm/h)", fontsize=10)
+
+plt.savefig("precipitation_timeseries.png", dpi=150, bbox_inches="tight")
 plt.show()
 
