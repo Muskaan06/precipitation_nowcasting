@@ -6,7 +6,7 @@ import pytorch_lightning as pl
 import torch
 import torch.nn as nn
 
-from earthformer.earthformer_module import CuboidTransformerModel
+from earthformer_module import CuboidTransformerModel
 
 
 class EarthformerModel(pl.LightningModule):
@@ -19,8 +19,8 @@ class EarthformerModel(pl.LightningModule):
         super().__init__()
         self.save_hyperparameters()
 
-        input_shape  = (4,  112, 112, 3)  # (T_in,  H, W, C)
-        target_shape = (6,  112, 112, 3)  # (T_out, H, W, C)
+        input_shape  = (13,  112, 112, 1)  # (T_in,  H, W, C)
+        target_shape = (12,  112, 112, 1)  # (T_out, H, W, C)
 
         num_blocks = 2
         self.model = CuboidTransformerModel(
@@ -79,6 +79,7 @@ class EarthformerModel(pl.LightningModule):
 
     def forward(self, x):
         # x: (B, T, H, W, C) — channels last
+        #add normalization
         return self.model(x)  # out: (B, T_out, H, W, C)
 
     def training_step(self, batch, batch_idx):

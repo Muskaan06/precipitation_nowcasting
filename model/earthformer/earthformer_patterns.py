@@ -2,7 +2,7 @@
 
 import functools
 
-from src.models.earthformer.registry import Registry
+from registry import Registry
 
 CuboidSelfAttentionPatterns = Registry("CuboidSelfAttentionPattern")
 CuboidCrossAttentionPatterns = Registry("CuboidCrossAttentionPatterns")

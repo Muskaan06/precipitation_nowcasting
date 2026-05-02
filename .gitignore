@@ -1,3 +1,4 @@
 __pycache__/
 mdapi/
-checkpoints/
+nowcast/precipitation_nowcasting/model/earthformer/checkpoints/
+nowcast/precipitation_nowcasting/model/tupann/checkpoint/

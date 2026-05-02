@@ -8,8 +8,8 @@ import torch.nn.functional as F
 import torch.utils.checkpoint as checkpoint
 from torch import nn
 
-from src.models.earthformer.earthformer_patterns import CuboidCrossAttentionPatterns, CuboidSelfAttentionPatterns
-from src.models.earthformer.earthformer_utils import (
+from earthformer_patterns import CuboidCrossAttentionPatterns, CuboidSelfAttentionPatterns
+from earthformer_utils import (
     _generalize_padding,
     _generalize_unpadding,
     apply_initialization,

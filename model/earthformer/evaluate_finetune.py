@@ -30,18 +30,18 @@ def to_pixel_intensity(x_norm):
 
 CONFIG = {
     "data_dir":    "/mnt/sda1/Muskaan/nowcast/IMC_Combined",
-    "train_split": 0.7,          # must match train.py
+    "train_split": 0.7,
     "batch_size":  16,
     "num_workers": 1,
     "seed":        42,
-    "checkpoint":  "/mnt/sda1/Muskaan/nowcast/precipitation_nowcasting/model/earthformer/lightning_logs_6_10/version_0/checkpoints/earthformer-best-epoch=3.ckpt",   # ← change to your .ckpt path
+    "checkpoint":  "/mnt/sda1/Muskaan/nowcast/precipitation_nowcasting/model/earthformer/checkpoints/finetune_11/earthformer-finetune-best-epoch=4.ckpt",  # ← update to finetuned .ckpt path
 
     # --- Sweep ranges (overwritten by compute_dynamic_thresholds) ---
     "csi_thresholds": [0.5, 1.0, 2.0, 5.0],
 }
 
 # ==========================================
-# DATASET  (identical to train.py, with log1p on targets)
+# DATASET — identical to 0-shot and finetune
 # ==========================================
 class NPZDataset(Dataset):
     def __init__(self, files):
@@ -56,8 +56,9 @@ class NPZDataset(Dataset):
 
         arr = np.expand_dims(arr, axis=-1)
         arr = np.nan_to_num(arr, nan=0.0)
-        x_raw = torch.from_numpy(arr[:6]).float()    #change
-        y_raw = torch.from_numpy(arr[6:16]).float()  #change
+        arr = np.concatenate(([arr[0]], arr))          # pad T by duplicating frame 0
+        x_raw = torch.from_numpy(arr[:13]).float()     # T_in=13
+        y_raw = torch.from_numpy(arr[13:25]).float()   # T_out=12
 
         return mmhr_to_intensity_with_normalize(x_raw), mmhr_to_intensity_with_normalize(y_raw)
 
@@ -66,24 +67,26 @@ class NPZDataset(Dataset):
 # ==========================================
 def load_model(checkpoint_path, device):
     """
-    Supports:
-      1. PyTorch Lightning checkpoint (has 'state_dict' key, keys prefixed 'model.')
-      2. Raw state-dict saved via torch.save(model.state_dict(), path)
+    Loads finetuned Lightning .ckpt checkpoint.
+    Mirrors load_model from evaluate_earthformer_0_shot.py exactly —
+    only difference is the checkpoint is now a Lightning .ckpt (not plain .pt)
+    so it always hits the 'state_dict' branch.
     """
     checkpoint = torch.load(checkpoint_path, map_location=device)
 
     model = EarthformerModel().to(device)
 
     if isinstance(checkpoint, dict) and "state_dict" in checkpoint:
-        # Lightning checkpoint — strip the "model." prefix added by LightningModule
+        # Finetuned Lightning .ckpt — strip the "model." prefix
         state = {
             k.replace("model.", "", 1): v
             for k, v in checkpoint["state_dict"].items()
             if k.startswith("model.")
         }
         model.model.load_state_dict(state)
-        print("Loaded PyTorch Lightning checkpoint.")
+        print("Loaded finetuned Lightning checkpoint.")
     else:
+        # Fallback: plain state dict
         model.load_state_dict(checkpoint)
         print("Loaded plain state-dict checkpoint.")
 
@@ -92,28 +95,28 @@ def load_model(checkpoint_path, device):
 
 
 # ==========================================
-# COLLECT PREDICTIONS
+# COLLECT PREDICTIONS — identical to 0-shot
 # ==========================================
 @torch.no_grad()
 def collect_predictions(model, loader, device):
     all_preds, all_targets = [], []
-    count = 1
     for x, y in loader:
-        x = x.to(device)               
-        pred = model(x)                     
+        x = x.to(device)
+        pred = model(x)
         print(f"pred min: {pred.min().item():.4f}, max: {pred.max().item():.4f}, mean: {pred.mean().item():.4f}, std: {pred.std().item():.4f}, in [0,1]: {(pred >= 0).all() and (pred <= 1).all()}")
 
-        pred = pred.permute(0, 1, 4, 2, 3)        
-        pred = pred.reshape(pred.size(0), 10, 112, 112)  #change
+        pred = pred.permute(0, 1, 4, 2, 3)
+        pred = pred.reshape(pred.size(0), 12, 112, 112)   # T_out=12, C=1
+        pred = pred[:, :-1, :, :]
 
         all_preds.append(pred.cpu())
-        all_targets.append(y)                     
-    preds   = torch.cat(all_preds,   dim=0)      
+        all_targets.append(y)
 
-    # convert targets to channels-first flat too (undo log1p for metric consistency)
-    targets_raw = torch.cat(all_targets, dim=0)   
-    # targets_raw = torch.expm1(targets_raw)
-    targets_raw = targets_raw.permute(0, 1, 4, 2, 3).reshape(-1, 10, 112, 112) #change
+    preds = torch.cat(all_preds, dim=0)
+
+    targets_raw = torch.cat(all_targets, dim=0)
+    targets_raw = targets_raw.permute(0, 1, 4, 2, 3).reshape(-1, 12, 112, 112)
+    targets_raw = targets_raw[:, :-1, :, :]
 
     return preds, targets_raw
 
@@ -137,25 +140,22 @@ def compute_dynamic_thresholds(targets, num_thresholds=5):
 
 
 # ==========================================
-# EVALUATION  (same pipeline as unet evaluate.py)
+# EVALUATION — identical to 0-shot
 # ==========================================
 def evaluate(preds, targets):
     """
-    preds, targets: (N, 18, 112, 112)  — on CPU, linear scale
+    preds, targets: (N, 12, 112, 112) — on CPU, normalized [0,1]
     """
     results = {}
     CONFIG["csi_thresholds"] = compute_dynamic_thresholds(to_pixel_intensity(targets))
 
-    B, C, H, W = preds.shape                       # C == 18
-    # temporal view: (N, 6 timesteps, 3 channels, H, W) → pick channel 0
-    pred_seq = preds.view(B, 10, 1, H, W)[:, :, 0]       #change
-    y_seq    = targets.view(B, 10, 1, H, W)[:, :, 0]     #change
+    B, C, H, W = preds.shape                            # C == 12
+    pred_seq = preds.view(B, 11, 1, H, W)[:, :, 0]     # (B, 12, H, W)
+    y_seq    = targets.view(B, 11, 1, H, W)[:, :, 0]
 
     data_range = float(targets.max() - targets.min())
     if data_range == 0:
         data_range = 1.0
-
-
 
     # --------------------------------------------------
     # 1.  MSE  &  MAE
@@ -199,7 +199,7 @@ def evaluate(preds, targets):
         print(f"  {thr:>12.2f}  {soft_scalar:>15.4f}")
 
     # --------------------------------------------------
-    # 4.  SSIM  (compute_ssim — Eq. 7 formula)
+    # 4.  SSIM
     # --------------------------------------------------
     print(f"\n{'='*55}")
     print(f"  SSIM (compute_ssim)")
@@ -213,10 +213,11 @@ def evaluate(preds, targets):
     pred_np = pred_seq.numpy() if isinstance(pred_seq, torch.Tensor) else pred_seq
     y_np    = y_seq.numpy()    if isinstance(y_seq,    torch.Tensor) else y_seq
 
-    T = pred_np.shape[1]
+    T = pred_np.shape[1]                                # T == 12
     for t in range(T):
         scores_t = [
-            compute_ssim(to_pixel_intensity(torch.from_numpy(pred_np[b, t])),to_pixel_intensity(torch.from_numpy(y_np[b, t])))
+            compute_ssim(to_pixel_intensity(torch.from_numpy(pred_np[b, t])),
+                         to_pixel_intensity(torch.from_numpy(y_np[b, t])))
             for b in range(pred_np.shape[0])
         ]
         valid_t = [s for s in scores_t if s != 0.0]
@@ -231,7 +232,7 @@ def evaluate(preds, targets):
     print(f"  Exp-Weighted Temporal SSIM")
     print(f"  {'-'*43}")
 
-    tw_ssim = exp_weighted_temporal_ssim(to_pixel_intensity(pred_seq),to_pixel_intensity(y_seq))
+    tw_ssim = exp_weighted_temporal_ssim(to_pixel_intensity(pred_seq), to_pixel_intensity(y_seq))
     tw_ssim = float(tw_ssim) if tw_ssim is not None else 0.0
     results["TW_SSIM"] = tw_ssim
     print(f"  {'TW_SSIM':>30}  {tw_ssim:>10.4f}")
@@ -240,9 +241,9 @@ def evaluate(preds, targets):
     return results
 
 
-def visualize_predictions(preds, targets, out_dir="./plottings2", num_samples=5):
+def visualize_predictions(preds, targets, out_dir="./plottings_finetune_11", num_samples=5):
 
-    T_OUT           = 10 #change
+    T_OUT           = 11
     N_CH            = 1
     TIMESTEP_LABELS = [f"t+{i*10} min" for i in range(1, T_OUT + 1)]
 
@@ -250,16 +251,14 @@ def visualize_predictions(preds, targets, out_dir="./plottings2", num_samples=5)
     n = min(num_samples, preds.shape[0])
 
     for i in range(1000, 1000+n):
-        # normalized [0, 1]
-        pred_norm = preds[i].view(T_OUT, N_CH, 112, 112)[:, 0].numpy()    # (6, 112, 112)
+        pred_norm = preds[i].view(T_OUT, N_CH, 112, 112)[:, 0].numpy()
         gt_norm   = targets[i].view(T_OUT, N_CH, 112, 112)[:, 0].numpy()
 
-        # raw mm/hr (before normalization)
         pred_mmhr = to_pixel_intensity(preds[i]).view(T_OUT, N_CH, 112, 112)[:, 0].numpy()
         gt_mmhr   = to_pixel_intensity(targets[i]).view(T_OUT, N_CH, 112, 112)[:, 0].numpy()
 
         fig = plt.figure(figsize=(T_OUT * 3.2, 14))
-        fig.suptitle(f"EarthFormer — Sample {i+1} | Precipitation (channel 0)",
+        fig.suptitle(f"EarthFormer Finetuned — Sample {i+1} | Precipitation (channel 0)",
                      fontsize=14, fontweight="bold", y=1.01)
 
         gs = GridSpec(4, T_OUT + 1, figure=fig,
@@ -290,7 +289,7 @@ def visualize_predictions(preds, targets, out_dir="./plottings2", num_samples=5)
             plt.colorbar(im, cax=cbar_axes[r])
             cbar_axes[r].set_ylabel("[0,1]" if r < 2 else "mm/hr", fontsize=8)
 
-        fname = os.path.join(out_dir, f"earthformer_sample{i+1:03d}.png")
+        fname = os.path.join(out_dir, f"earthformer_finetune_sample{i+1:03d}.png")
         fig.savefig(fname, dpi=150, bbox_inches="tight")
         plt.close(fig)
         print(f"  Saved → {fname}")
@@ -301,7 +300,7 @@ def visualize_predictions(preds, targets, out_dir="./plottings2", num_samples=5)
 # ==========================================
 # SAVE RESULTS TO CSV
 # ==========================================
-def save_results(results, path="validation_results_earthformer.csv"):
+def save_results(results, path="validation_results_earthformer_finetune_11.csv"):
     import csv
     with open(path, "w", newline="") as f:
         writer = csv.writer(f)
@@ -312,7 +311,7 @@ def save_results(results, path="validation_results_earthformer.csv"):
 
 
 # ==========================================
-# MAIN
+# MAIN — identical to 0-shot
 # ==========================================
 def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
