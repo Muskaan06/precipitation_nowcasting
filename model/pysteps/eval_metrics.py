@@ -53,6 +53,50 @@ def hard_csi(pred, target, threshold=1.0, eps=1e-7):
 
     return TP / (denominator + eps)
 
+
+def hard_pod(pred, target, threshold=1.0, eps=1e-7):
+    """
+    Probability of Detection (Hit Rate) for validation logging.
+
+    POD = TP / (TP + FN)
+
+    Fraction of observed rain events correctly predicted. Returns None
+    when there is no observed rain (TP + FN == 0), since POD is undefined.
+    """
+    pred_bin   = (pred   >= threshold).float()
+    target_bin = (target >= threshold).float()
+
+    TP = (pred_bin * target_bin).sum()
+    FN = ((1 - pred_bin) * target_bin).sum()
+
+    denominator = TP + FN
+    if denominator == 0:
+        return None
+
+    return TP / (denominator + eps)
+
+
+def hard_far(pred, target, threshold=1.0, eps=1e-7):
+    """
+    False Alarm Ratio for validation logging.
+
+    FAR = FP / (TP + FP)
+
+    Fraction of predicted rain events that did not occur. Returns None
+    when no rain was predicted (TP + FP == 0), since FAR is undefined.
+    """
+    pred_bin   = (pred   >= threshold).float()
+    target_bin = (target >= threshold).float()
+
+    TP = (pred_bin * target_bin).sum()
+    FP = (pred_bin * (1 - target_bin)).sum()
+
+    denominator = TP + FP
+    if denominator == 0:
+        return None
+
+    return FP / (denominator + eps)
+
 # ─────────────────────────────────────────────
 #  Differentiable SSIM (PyTorch, for losses)
 # ─────────────────────────────────────────────
