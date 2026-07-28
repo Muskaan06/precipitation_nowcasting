@@ -2,3 +2,5 @@ __pycache__/
 mdapi/
 nowcast/precipitation_nowcasting/model/earthformer/checkpoints/
 nowcast/precipitation_nowcasting/model/tupann/checkpoint/
+2307.10422v2.pdf
+dai-et-al-2025-four-hour-thunderstorm-nowcasting-using-a-deep-diffusion-model-for-satellite-data.pdf
